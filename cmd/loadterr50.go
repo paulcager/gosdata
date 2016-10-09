@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+_	"io/ioutil"
+	"io"
 )
 
 const APP_VERSION = "0.1"
@@ -26,7 +28,7 @@ func main() {
 		os.Exit(0)
 	}
 
-var count int
+	var count int
 	err := filepath.Walk(sourceDir, func(path string, f os.FileInfo, err error) error {
 		if err == nil && !f.IsDir() && strings.HasSuffix(f.Name(), ".zip") {
 			count++
@@ -38,7 +40,7 @@ var count int
 	if err != nil {
 		panic(err)
 	}
-	
+
 	fmt.Println("Count", count)
 }
 
@@ -48,6 +50,26 @@ func readZip(path string) error {
 		panic(err)
 	}
 	defer r.Close()
-	
+
+	for _, f := range r.File {
+		if strings.HasSuffix(f.Name, ".asc") {
+			src, err := f.Open()
+			if err != nil {
+				return err
+			}
+			defer src.Close()
+			//fmt.Println(f.Name)
+			dst, err := os.Create(sourceDir + "/tiles/" + f.Name)
+			if err != nil {
+				return err
+			}
+			defer dst.Close()
+			_, err = io.Copy(dst, src)
+			if err != nil {
+				return err
+			} 
+		}
+	}
+
 	return nil
 }
