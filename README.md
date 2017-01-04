@@ -16,6 +16,8 @@ missing -1
 Great Gable is  321132,510350 or NY211103 (NY2113210350), 54.482161,-3.219135
 Height: 899m
 
+For the 1000m grid square containing GG:
+
 NW corner: 321000,511000 or NY210110
 Height: ~550
 
@@ -26,7 +28,13 @@ SW corner: 321000, 510000, NY210100
 Height: ~~675 (on Great Napes so very approx_.
 
 SE corner: 322000, 510000 or NY220100
-Height: 490
+Height: 49
+
+
+         NY2111                NY2211
+         
+         NY2110                NY2210
+
 
 -----------
 
@@ -38,6 +46,9 @@ File os-terrain-50/ny/ny21_OST50GRID_20160726.zip contains ny21.asc:
   yllcorner 510000
   cellsize 50
 
+Each line has 200 (ncols) values per line, and there are 200 lines.
+Each file is a 10km² square (10000). Therefore 10x10 of the 1km² above.
+
 
 NY21.gml contains:
 
@@ -45,3 +56,4 @@ NY21.gml contains:
     <gml:upperCorner>330000 520000</gml:upperCorner>
     origin <gml:pos>320000 510000</gml:pos>   - SW corner
     <gml:offsetVector>0 50</gml:offsetVector>
+
