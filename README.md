@@ -1,4 +1,31 @@
 # gosdata
+
+# Grid Refs
+
+(0,0) is SW of Scilly Isles at SV000000.
+
+AA is near Iceland and ZZ in Northern Italy, but really there only a few useful squares for mainland GB.
+
+First letter defines 500km x 500km square:
+
+Origins (SW)
+
+   H (0, 1000000); 
+   N (0,  500000);  O (500000, 500000)
+   S (0,       0);  T (500000, 0) 
+
+Square O is practically empty.
+
+Second letter is
+
+   A B C D E
+   F G H J K
+   L M N O P
+   Q R S T U
+   V W X Y Z 
+
+## Elevation Data
+
 Decoding OS Elevation data in Go
 
   xllcorner goes from [0] 10000-650000
