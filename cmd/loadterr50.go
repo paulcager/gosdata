@@ -4,11 +4,12 @@ import (
 	"archive/zip"
 	"flag"
 	"fmt"
+	"github.com/paulcager/gosdata/osgrid"
+	"io"
+	_ "io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
-_	"io/ioutil"
-	"io"
 )
 
 const APP_VERSION = "0.1"
@@ -21,7 +22,8 @@ const (
 var versionFlag *bool = flag.Bool("v", false, "Print the version number.")
 
 func main() {
-	flag.Parse() // Scan the arguments list
+	osgrid.X()
+	flag.Parse()
 
 	if *versionFlag {
 		fmt.Println("Version:", APP_VERSION)
@@ -67,7 +69,7 @@ func readZip(path string) error {
 			_, err = io.Copy(dst, src)
 			if err != nil {
 				return err
-			} 
+			}
 		}
 	}
 

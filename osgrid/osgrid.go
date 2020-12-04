@@ -10,10 +10,16 @@ import (
 
 const (
 	LargeGridSize = 500 * 1000 // 500km
-	SmallGridSize = 100 * 1000 // 500km
+	SmallGridSize = 100 * 1000 // 100km
 )
 
-var InvalidGridLetter = errors.New("Invalid grid letter")
+// Sample conversion: SJ9239552997	392395	352997	53.074149	-2.1149638
+// OS Grid letters
+// 		https://getoutside.ordnancesurvey.co.uk/site/uploads/images/assets/Web%20images/Diagram-A.jpg
+// The standard resource:
+// 		https://www.movable-type.co.uk/scripts/latlong-os-gridref.html
+
+var InvalidGridLetter = errors.New("invalid grid letter")
 
 func invalid(s string) error {
 	return fmt.Errorf("Invalid GridRef: %q", s)
@@ -80,6 +86,9 @@ func Parse(s string) (OSGrid, error) {
 	}
 	
 	r := r2.Rect{}
+
+	_= p
+
 	
-	// TODO
+	panic(r)
 }
