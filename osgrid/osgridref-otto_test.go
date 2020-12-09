@@ -2,6 +2,9 @@ package osgrid
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"io/ioutil"
+	"net/http"
 	"testing"
 )
 
@@ -52,5 +55,16 @@ func BenchmarkGoImpl(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_,_ = o.toLatLon()
+	}
+}
+
+func BenchmarkAPICall(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		resp, err := http.Get("http://192.168.0.123:9090/?gridRef=SJ121689")
+		require.NoError(b, err)
+		reply, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		require.NoError(b, err)
+		assert.Contains(b, string(reply), "53")
 	}
 }

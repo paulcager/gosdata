@@ -3,6 +3,9 @@ package osgrid
 import (
 	"fmt"
 	"math"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
@@ -35,19 +38,6 @@ import (
 
 /* OsGridRef  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-type OsGridRef struct {
-	Easting, Northing int
-}
-
-func (o OsGridRef) valid() bool {
-	return o.Easting >= 0 && o.Easting <= 700e3 && o.Northing >= 0 && o.Northing <= 1300e3
-}
-func (o OsGridRef) assertValid() {
-	if !o.valid() {
-		panic(fmt.Sprintf("Invalid OS grid ref: %+v", o))
-	}
-}
-
 const (
 	toRadians = math.Pi / 180.0
 	toDegrees = 180.0 / math.Pi
@@ -75,6 +65,84 @@ const (
 	n2 = n * n
 	n3 = n * n * n
 )
+
+type OsGridRef struct {
+	Easting, Northing int
+}
+
+var (
+	commaSeparatedFormat = regexp.MustCompile(`^(\d+),\s*(\d+)$`)
+	gridRefFormat        = regexp.MustCompile(`^[A-Z]{2}[0-9]+$`)
+)
+
+func ParseOsGridRef(s string) (OsGridRef, error) {
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ToUpper(s)
+
+	matches := commaSeparatedFormat.FindStringSubmatch(s)
+	if len(matches) > 0 {
+		e, err1 := strconv.ParseFloat(matches[1], 32)
+		n, err2 := strconv.ParseFloat(matches[2], 32)
+		if err1 != nil || err2 != nil {
+			return OsGridRef{}, fmt.Errorf("invalid comma-separated grid ref format: %q", s)
+		}
+		return OsGridRef{
+			Easting:  int(e),
+			Northing: int(n),
+		}, nil
+	}
+
+	matches = gridRefFormat.FindStringSubmatch(s)
+	if len(matches) == 0 {
+		return OsGridRef{}, fmt.Errorf("invalid grid ref format: %q", s)
+	}
+
+	// get numeric values of letter references, mapping A->0, B->1, C->2, etc:
+	l1 := int(s[0] - 'A')
+	l2 := int(s[1] - 'A')
+	// shuffle down letters after 'I' since 'I' is not used in grid:
+	if l1 > 7 {
+		l1--
+	}
+	if l2 > 7 {
+		l2--
+	}
+
+	// sanity check
+	if l1 < 8 || l1 > 18 {
+		return OsGridRef{}, fmt.Errorf(`invalid grid reference %q`, s)
+	}
+
+	// convert grid letters into 100km-square indexes from false origin (grid square SV):
+	e100km := ((l1-2)%5)*5 + (l2 % 5)
+	n100km := (19 - (l1/5)*5) - (l2 / 5)
+
+	// skip grid letters to get numeric (easting/northing) part of ref
+	digits := s[2:]
+	// split half way
+	e, n := digits[:len(digits)/2], digits[len(digits)/2:]
+	if len(e) != len(n) {
+		return OsGridRef{}, fmt.Errorf(`invalid grid reference %q`, s)
+	}
+
+	// standardise to 10-digit refs (metres)
+	e = (e + "00000")[:5]
+	n = (n + "00000")[:5]
+
+	easting, _ := strconv.ParseInt(e, 10, 32)
+	northing, _ := strconv.ParseInt(n, 10, 32)
+
+	return OsGridRef{Easting: e100km*100000 + int(easting), Northing: n100km*100000 + int(northing)}, nil
+}
+
+func (o OsGridRef) valid() bool {
+	return o.Easting >= 0 && o.Easting <= 700e3 && o.Northing >= 0 && o.Northing <= 1300e3
+}
+func (o OsGridRef) assertValid() {
+	if !o.valid() {
+		panic(fmt.Sprintf("Invalid OS grid ref: %+v", o))
+	}
+}
 
 func (o OsGridRef) toLatLon() (float64, float64) {
 	E := float64(o.Easting)

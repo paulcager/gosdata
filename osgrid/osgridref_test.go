@@ -2,6 +2,7 @@ package osgrid
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,6 +59,52 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 			fmt.Printf("%s: expected %f,%f got %f,%f\n", tt.name, tt.expectedLat, tt.expectedLon, lat, lon)
 			assert.InEpsilon(t, tt.expectedLat, lat, 1.0/(50*60*60))
 			assert.InEpsilon(t, tt.expectedLon, lon, 1.0/(50*60*60))
+		})
+	}
+}
+
+func TestParseOsGridRef(t *testing.T) {
+	tests := []struct {
+		s string
+		want    OsGridRef
+		wantErr bool
+	}{
+		{
+			s:       "651409, 313177",
+			want:    OsGridRef{Easting:  651409, Northing: 313177},
+			wantErr: false,
+		},
+		{
+			s:       "TG 51409 13177",
+			want:    OsGridRef{Easting:  651409, Northing: 313177},
+			wantErr: false,
+		},
+		{
+			s:       "SU 0 0",
+			want:    OsGridRef{Easting:  400000, Northing: 100000},
+			wantErr: false,
+		},
+		{
+			s:       "SE095255",
+			want:    OsGridRef{Easting:  409500, Northing: 425500},
+			wantErr: false,
+		},
+		{
+			s:       "SE0849025580",
+			want:    OsGridRef{Easting:  408490, Northing: 425580},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.s, func(t *testing.T) {
+			got, err := ParseOsGridRef(tt.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ParseOsGridRef() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ParseOsGridRef() got = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
