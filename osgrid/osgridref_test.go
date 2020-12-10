@@ -94,6 +94,26 @@ func TestParseOsGridRef(t *testing.T) {
 			want:    OsGridRef{Easting:  408490, Northing: 425580},
 			wantErr: false,
 		},
+		{
+			s:       "SI095255",
+			wantErr: true,
+		},
+		{
+			s:       "ZZ095255",
+			wantErr: true,
+		},
+		{
+			s:       "S095255",
+			wantErr: true,
+		},
+		{
+			s:       "SJ95255",
+			wantErr: true,
+		},
+		{
+			s:       "SJ95X255",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.s, func(t *testing.T) {

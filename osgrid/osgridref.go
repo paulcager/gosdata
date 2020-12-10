@@ -38,6 +38,10 @@ import (
 
 /* OsGridRef  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+// Sample conversion: SJ9239552997	392395	352997	53.074149	-2.1149638
+// OS Grid letters
+// 		https://getoutside.ordnancesurvey.co.uk/site/uploads/images/assets/Web%20images/Diagram-A.jpg
+
 const (
 	toRadians = math.Pi / 180.0
 	toDegrees = 180.0 / math.Pi
@@ -101,6 +105,10 @@ func ParseOsGridRef(s string) (OsGridRef, error) {
 	l1 := int(s[0] - 'A')
 	l2 := int(s[1] - 'A')
 	// shuffle down letters after 'I' since 'I' is not used in grid:
+	if s[0] == 'I' || s[1] == 'I' {
+		return OsGridRef{}, fmt.Errorf("invalid grid ref format: %q", s)
+	}
+
 	if l1 > 7 {
 		l1--
 	}
@@ -199,7 +207,11 @@ func (o OsGridRef) toLatLon() (float64, float64) {
 	λ := λ0 + X*dE - XI*dE3 + XII*dE5 - XIIA*dE7
 
 	// That has calculated the lat/lon in OSGB36; we want WGS84
-	// However, not done yet (the differences are minor).
+	φ, λ = osgb36ToWGS84(φ, λ)
 
 	return φ * toDegrees, λ * toDegrees
+}
+
+func osgb36ToWGS84(lat, lon float64) (float64, float64) {
+
 }

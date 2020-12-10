@@ -48,10 +48,8 @@ func BenchmarkOttoImpl(b *testing.B) {
 }
 
 func BenchmarkGoImpl(b *testing.B) {
-	o := OsGridRef{
-		Easting:  651409,
-		Northing: 313177,
-	}
+	o, err := ParseOsGridRef("TL 44982 57869")
+	assert.NoError(b, err)
 
 	for i := 0; i < b.N; i++ {
 		_,_ = o.toLatLon()
