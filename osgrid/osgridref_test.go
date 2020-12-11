@@ -26,28 +26,21 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 			// From  http://www.movable-type.co.uk/scripts/latlong-os-gridref.html:
 			// 	For OSGB36, expect 53.073851°N, 002.113526°W
 			//	For WGS84,  expect 53.074149°N, 002.114964°W
-			expectedLat: +53.073851,
-			expectedLon: -2.113526,
+			expectedLat: +53.074149,
+			expectedLon: -2.114964,
 		},
 		{
 			name:    "TG 51409 13177",
 			easting: 651409, northing: 313177,
-			expectedLat: +52.657568,
-			expectedLon: 001.717908,
+			expectedLat: +52.657977,
+			expectedLon: 1.716020,
 		},
 		{
-			name:    "OS Worked Example",
-			easting: 651410, northing: 313177,
-			expectedLat: 52.0 + (39.0 / 60) + (27.2531 / 3600),
-			expectedLon: 1 + (43.0 / 60) + (4.5177 / 3600),
-		},
-		{
-			name:    "Movable Type Example",
+			name:    "Movable Type Example (TL4498257869)",
 			easting: 544982, northing: 257869,
-			expectedLat: 52.199558,
-			expectedLon: 0.121654,
+			expectedLat: 52.199992,
+			expectedLon: 0.119989,
 		},
-
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -56,42 +49,44 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 				Northing: tt.northing,
 			}
 			lat, lon := o.toLatLon()
-			fmt.Printf("%s: expected %f,%f got %f,%f\n", tt.name, tt.expectedLat, tt.expectedLon, lat, lon)
-			assert.InEpsilon(t, tt.expectedLat, lat, 1.0/(50*60*60))
-			assert.InEpsilon(t, tt.expectedLon, lon, 1.0/(50*60*60))
+			lat1, lon1, err := OSGridToLatLon(fmt.Sprintf("%d,%d", tt.easting, tt.northing))
+			assert.NoError(t, err)
+			fmt.Printf("%s: expected %f,%f got %f,%f (JS: %f,%f)\n", tt.name, tt.expectedLat, tt.expectedLon, lat, lon, lat1, lon1)
+			assert.InEpsilon(t, tt.expectedLat, lat, 0.00005)
+			assert.InEpsilon(t, tt.expectedLon, lon, 0.00005)
 		})
 	}
 }
 
 func TestParseOsGridRef(t *testing.T) {
 	tests := []struct {
-		s string
+		s       string
 		want    OsGridRef
 		wantErr bool
 	}{
 		{
 			s:       "651409, 313177",
-			want:    OsGridRef{Easting:  651409, Northing: 313177},
+			want:    OsGridRef{Easting: 651409, Northing: 313177},
 			wantErr: false,
 		},
 		{
 			s:       "TG 51409 13177",
-			want:    OsGridRef{Easting:  651409, Northing: 313177},
+			want:    OsGridRef{Easting: 651409, Northing: 313177},
 			wantErr: false,
 		},
 		{
 			s:       "SU 0 0",
-			want:    OsGridRef{Easting:  400000, Northing: 100000},
+			want:    OsGridRef{Easting: 400000, Northing: 100000},
 			wantErr: false,
 		},
 		{
 			s:       "SE095255",
-			want:    OsGridRef{Easting:  409500, Northing: 425500},
+			want:    OsGridRef{Easting: 409500, Northing: 425500},
 			wantErr: false,
 		},
 		{
 			s:       "SE0849025580",
-			want:    OsGridRef{Easting:  408490, Northing: 425580},
+			want:    OsGridRef{Easting: 408490, Northing: 425580},
 			wantErr: false,
 		},
 		{

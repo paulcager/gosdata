@@ -207,11 +207,19 @@ func (o OsGridRef) toLatLon() (float64, float64) {
 	λ := λ0 + X*dE - XI*dE3 + XII*dE5 - XIIA*dE7
 
 	// That has calculated the lat/lon in OSGB36; we want WGS84
-	φ, λ = osgb36ToWGS84(φ, λ)
+	φ, λ = osgb36ToWGS84(φ*toDegrees, λ*toDegrees)
 
-	return φ * toDegrees, λ * toDegrees
+	return φ, λ
 }
 
 func osgb36ToWGS84(lat, lon float64) (float64, float64) {
+	latLon := LatLonEllipsoidalDatum{
+		Lat:    lat,
+		Lon:    lon,
+		Height: 0,
+		Datum:  OSGB36,
+	}
 
+	converted := latLon.ConvertDatum(WGS84)
+	return converted.Lat, converted.Lon
 }

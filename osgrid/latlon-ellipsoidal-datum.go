@@ -1,5 +1,7 @@
 package osgrid
 
+import "math"
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 /* Geodesy tools for conversions between (historical) datums          (c) Chris Veness 2005-2019  */
 /*                                                                                   MIT Licence  */
@@ -33,10 +35,10 @@ package osgrid
 /*
  * Ellipsoid parameters; exposed through static getter below.
  */
-type ellipseoid struct{ a, b, f float64 }
+type Ellipseoid struct{ a, b, f float64 }
 
 var (
-	ellipsoids = map[string]ellipseoid{
+	ellipsoids = map[string]Ellipseoid{
 		"WGS84":         {a: 6378137, b: 6356752.314245, f: 1 / 298.257223563},
 		"Airy1830":      {a: 6377563.396, b: 6356256.909, f: 1 / 299.3249646},
 		"AiryModified":  {a: 6377340.189, b: 6356034.448, f: 1 / 299.3249646},
@@ -48,99 +50,6 @@ var (
 		"WGS72":         {a: 6378135, b: 6356750.5, f: 1 / 298.26},
 	}
 )
-
-/*
- * Datums; exposed through static getter below.
- */
-var (
-	datums = map[string]struct {
-		ellipsoid ellipseoid
-		transform [7]float64
-	}{
-		// transforms: t in metres, s in ppm, r in arcseconds              tx       ty        tz       s        rx        ry        rz
-		"ED50":       {ellipsoid: ellipsoids["Intl1924"], transform: [7]float64{89.5, 93.8, 123.1, -1.2, 0.0, 0.0, 0.156}},                     // epsg.io/1311
-		"ETRS89":     {ellipsoid: ellipsoids["GRS80"], transform: [7]float64{0, 0, 0, 0, 0, 0, 0}},                                             // epsg.io/1149; @ 1-metre level
-		"Irl1975":    {ellipsoid: ellipsoids["AiryModified"], transform: [7]float64{-482.530, 130.596, -564.557, -8.150, 1.042, 0.214, 0.631}}, // epsg.io/1954
-		"NAD27":      {ellipsoid: ellipsoids["Clarke1866"], transform: [7]float64{8, -160, -176, 0, 0, 0, 0}},
-		"NAD83":      {ellipsoid: ellipsoids["GRS80"], transform: [7]float64{0.9956, -1.9103, -0.5215, -0.00062, 0.025915, 0.009426, 0.011599}},
-		"NTF":        {ellipsoid: ellipsoids["Clarke1880IGN"], transform: [7]float64{168, 60, -320, 0, 0, 0, 0}},
-		"OSGB36":     {ellipsoid: ellipsoids["Airy1830"], transform: [7]float64{-446.448, 125.157, -542.060, 20.4894, -0.1502, -0.2470, -0.8421}}, // epsg.io/1314
-		"Potsdam":    {ellipsoid: ellipsoids["Bessel1841"], transform: [7]float64{-582, -105, -414, -8.3, 1.04, 0.35, -3.08}},
-		"TokyoJapan": {ellipsoid: ellipsoids["Bessel1841"], transform: [7]float64{148, -507, -685, 0, 0, 0, 0}},
-		"WGS72":      {ellipsoid: ellipsoids["WGS72"], transform: [7]float64{0, 0, -4.5, -0.22, 0, 0, 0.554}},
-		"WGS84":      {ellipsoid: ellipsoids["WGS84"], transform: [7]float64{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}},
-	}
-	/* sources:
-	 * - ED50:       www.gov.uk/guidance/oil-and-gas-petroleum-operations-notices#pon-4
-	 * - Irl1975:    www.osi.ie/wp-content/uploads/2015/05/transformations_booklet.pdf
-	 * - NAD27:      en.wikipedia.org/wiki/Helmert_transformation
-	 * - NAD83:      www.uvm.edu/giv/resources/WGS84_NAD83.pdf [strictly, WGS84(G1150) -> NAD83(CORS96) @ epoch 1997.0]
-	 *               (note NAD83(1986) ≡ WGS84(Original); confluence.qps.nl/pages/viewpage.action?pageId=29855173)
-	 * - NTF:        Nouvelle Triangulation Francaise geodesie.ign.fr/contenu/fichiers/Changement_systeme_geodesique.pdf
-	 * - OSGB36:     www.ordnancesurvey.co.uk/docs/support/guide-coordinate-systems-great-britain.pdf
-	 * - Potsdam:    kartoweb.itc.nl/geometrics/Coordinate%20transformations/coordtrans.html
-	 * - TokyoJapan: www.geocachingtoolbox.com?page=datumEllipsoidDetails
-	 * - WGS72:      www.icao.int/safety/pbn/documentation/eurocontrol/eurocontrol wgs 84 implementation manual.pdf
-	 *
-	 * more transform parameters are available from earth-info.nga.mil/GandG/coordsys/datums/NATO_DT.pdf,
-	 * www.fieldenmaps.info/cconv/web/cconv_params.js
-	 */
-	/* note:
-	 * - ETRS89 reference frames are coincident with WGS-84 at epoch 1989.0 (ie null transform) at the one metre level.
-	 */
-
-
-/* LatLon - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-/**
- * Latitude/longitude points on an ellipsoidal model earth, with ellipsoid parameters and methods
- * for converting between datums and to geocentric (ECEF) cartesian coordinates.
- *
- * @extends LatLonEllipsoidal
- */
-class LatLonEllipsoidal_Datum extends LatLonEllipsoidal {
-
-/**
- * Creates a geodetic latitude/longitude point on an ellipsoidal model earth using given datum.
- *
- * @param {number} lat - Latitude (in degrees).
- * @param {number} lon - Longitude (in degrees).
- * @param {number} [height=0] - Height above ellipsoid in metres.
- * @param {LatLon.datums} datum - Datum this point is defined within.
- *
- * @example
- *   import LatLon from '/js/geodesy/latlon-ellipsoidal-datum.js';
- *   const p = new LatLon(53.3444, -6.2577, 17, LatLon.datums.Irl1975);
- */
-constructor(lat, lon, height = 0, datum = datums.WGS84) {
-if (!datum || datum.ellipsoid==undefined) throw new TypeError(`unrecognised datum ‘${datum}’`);
-
-super(lat, lon, height);
-
-this._datum = datum;
-}
-
-
-/**
- * Datum this point is defined within.
- */
-get datum() {
-return this._datum;
-}
-
-
-/**
- * Ellipsoids with their parameters; semi-major axis (a), semi-minor axis (b), and flattening (f).
- *
- * Flattening f = (a−b)/a; at least one of these parameters is derived from defining constants.
- *
- * @example
- *   const a = LatLon.ellipsoids.Airy1830.a; // 6377563.396
- */
-static get ellipsoids() {
-return ellipsoids;
-}
-
 
 /**
  * Datums; with associated ellipsoid, and Helmert transform parameters to convert from WGS-84
@@ -158,51 +67,101 @@ return ellipsoids;
  *   const tx = LatLon.datums.OSGB36.transform;                     // [ tx, ty, tz, s, rx, ry, rz ]
  *   const availableDatums = Object.keys(LatLon.datums).join(', '); // ED50, Irl1975, NAD27, ...
  */
-static get datums() {
-return datums;
+type Datum struct {
+	Name      string
+	Ellipsoid Ellipseoid
+	Transform [7]float64
 }
 
+var Datums = map[string]Datum{
+	// transforms: t in metres, s in ppm, r in arcseconds              tx       ty        tz       s        rx        ry        rz
+	"ED50":       {Name: "ED50", Ellipsoid: ellipsoids["Intl1924"], Transform: [7]float64{89.5, 93.8, 123.1, -1.2, 0.0, 0.0, 0.156}},                        // epsg.io/1311
+	"ETRS89":     {Name: "ETRS89", Ellipsoid: ellipsoids["GRS80"], Transform: [7]float64{0, 0, 0, 0, 0, 0, 0}},                                              // epsg.io/1149; @ 1-metre level
+	"Irl1975":    {Name: "Irl1975", Ellipsoid: ellipsoids["AiryModified"], Transform: [7]float64{-482.530, 130.596, -564.557, -8.150, 1.042, 0.214, 0.631}}, // epsg.io/1954
+	"NAD27":      {Name: "NAD27", Ellipsoid: ellipsoids["Clarke1866"], Transform: [7]float64{8, -160, -176, 0, 0, 0, 0}},
+	"NAD83":      {Name: "NAD83", Ellipsoid: ellipsoids["GRS80"], Transform: [7]float64{0.9956, -1.9103, -0.5215, -0.00062, 0.025915, 0.009426, 0.011599}},
+	"NTF":        {Name: "NTF", Ellipsoid: ellipsoids["Clarke1880IGN"], Transform: [7]float64{168, 60, -320, 0, 0, 0, 0}},
+	"OSGB36":     {Name: "OSGB36", Ellipsoid: ellipsoids["Airy1830"], Transform: [7]float64{-446.448, 125.157, -542.060, 20.4894, -0.1502, -0.2470, -0.8421}}, // epsg.io/1314
+	"Potsdam":    {Name: "Potsdam", Ellipsoid: ellipsoids["Bessel1841"], Transform: [7]float64{-582, -105, -414, -8.3, 1.04, 0.35, -3.08}},
+	"TokyoJapan": {Name: "TokyoJapan", Ellipsoid: ellipsoids["Bessel1841"], Transform: [7]float64{148, -507, -685, 0, 0, 0, 0}},
+	"WGS72":      {Name: "WGS72", Ellipsoid: ellipsoids["WGS72"], Transform: [7]float64{0, 0, -4.5, -0.22, 0, 0, 0.554}},
+	"WGS84":      {Name: "WGS84", Ellipsoid: ellipsoids["WGS84"], Transform: [7]float64{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}},
+}
 
-// note instance datum getter/setters are in LatLonEllipsoidal
+var (
+	OSGB36 = Datums["OSGB36"]
+	WGS84  = Datums["WGS84"]
+)
+
+/* sources:
+ * - ED50:       www.gov.uk/guidance/oil-and-gas-petroleum-operations-notices#pon-4
+ * - Irl1975:    www.osi.ie/wp-content/uploads/2015/05/transformations_booklet.pdf
+ * - NAD27:      en.wikipedia.org/wiki/Helmert_transformation
+ * - NAD83:      www.uvm.edu/giv/resources/WGS84_NAD83.pdf [strictly, WGS84(G1150) -> NAD83(CORS96) @ epoch 1997.0]
+ *               (note NAD83(1986) ≡ WGS84(Original); confluence.qps.nl/pages/viewpage.action?pageId=29855173)
+ * - NTF:        Nouvelle Triangulation Francaise geodesie.ign.fr/contenu/fichiers/Changement_systeme_geodesique.pdf
+ * - OSGB36:     www.ordnancesurvey.co.uk/docs/support/guide-coordinate-systems-great-britain.pdf
+ * - Potsdam:    kartoweb.itc.nl/geometrics/Coordinate%20transformations/coordtrans.html
+ * - TokyoJapan: www.geocachingtoolbox.com?page=datumEllipsoidDetails
+ * - WGS72:      www.icao.int/safety/pbn/documentation/eurocontrol/eurocontrol wgs 84 implementation manual.pdf
+ *
+ * more transform parameters are available from earth-info.nga.mil/GandG/coordsys/datums/NATO_DT.pdf,
+ * www.fieldenmaps.info/cconv/web/cconv_params.js
+ */
+/* note:
+ * - ETRS89 reference frames are coincident with WGS-84 at epoch 1989.0 (ie null transform) at the one metre level.
+ */
+
+/* LatLon - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
 /**
- * Parses a latitude/longitude point from a variety of formats.
+ * Latitude/longitude points on an ellipsoidal model earth, with ellipsoid parameters and methods
+ * for converting between datums and to geocentric (ECEF) cartesian coordinates.
  *
- * Latitude & longitude (in degrees) can be supplied as two separate parameters, as a single
- * comma-separated lat/lon string, or as a single object with { lat, lon } or GeoJSON properties.
- *
- * The latitude/longitude values may be numeric or strings; they may be signed decimal or
- * deg-min-sec (hexagesimal) suffixed by compass direction (NSEW); a variety of separators are
- * accepted. Examples -3.62, '3 37 12W', '3°37′12″W'.
- *
- * Thousands/decimal separators must be comma/dot; use Dms.fromLocale to convert locale-specific
- * thousands/decimal separators.
- *
- * @param   {number|string|Object} lat|latlon - Geodetic Latitude (in degrees) or comma-separated lat/lon or lat/lon object.
- * @param   {number}               [lon] - Longitude in degrees.
- * @param   {number}               [height=0] - Height above ellipsoid in metres.
- * @param   {LatLon.datums}        [datum=WGS84] - Datum this point is defined within.
- * @returns {LatLon} Latitude/longitude point on ellipsoidal model earth using given datum.
- * @throws  {TypeError} Unrecognised datum.
- *
- * @example
- *   const p = LatLon.parse('51.47736, 0.0000', 0, LatLon.datums.OSGB36);
+ * @extends LatLonEllipsoidal
  */
-static parse(...args) {
-let datum = datums.WGS84;
-
-// if the last argument is a datum, use that, otherwise use default WGS-84
-if (args.length==4 || (args.length==3 && typeof args[2] == 'object')) datum = args.pop();
-
-if (!datum || datum.ellipsoid==undefined) throw new TypeError(`unrecognised datum ‘${datum}’`);
-
-const point = super.parse(...args);
-
-point._datum = datum;
-
-return point;
+type LatLonEllipsoidalDatum struct {
+	Lat, Lon, Height float64
+	Datum            Datum
 }
 
+///**
+// * Parses a latitude/longitude point from a variety of formats.
+// *
+// * Latitude & longitude (in degrees) can be supplied as two separate parameters, as a single
+// * comma-separated lat/lon string, or as a single object with { lat, lon } or GeoJSON properties.
+// *
+// * The latitude/longitude values may be numeric or strings; they may be signed decimal or
+// * deg-min-sec (hexagesimal) suffixed by compass direction (NSEW); a variety of separators are
+// * accepted. Examples -3.62, '3 37 12W', '3°37′12″W'.
+// *
+// * Thousands/decimal separators must be comma/dot; use Dms.fromLocale to convert locale-specific
+// * thousands/decimal separators.
+// *
+// * @param   {number|string|Object} lat|latlon - Geodetic Latitude (in degrees) or comma-separated lat/lon or lat/lon object.
+// * @param   {number}               [lon] - Longitude in degrees.
+// * @param   {number}               [height=0] - Height above ellipsoid in metres.
+// * @param   {LatLon.datums}        [datum=WGS84] - Datum this point is defined within.
+// * @returns {LatLon} Latitude/longitude point on ellipsoidal model earth using given datum.
+// * @throws  {TypeError} Unrecognised datum.
+// *
+// * @example
+// *   const p = LatLon.parse('51.47736, 0.0000', 0, LatLon.datums.OSGB36);
+// */
+//static parse(...args) {
+//let datum = datums.WGS84;
+//
+//// if the last argument is a datum, use that, otherwise use default WGS-84
+//if (args.length==4 || (args.length==3 && typeof args[2] == 'object')) datum = args.pop();
+//
+//if (!datum || datum.ellipsoid==undefined) throw new TypeError(`unrecognised datum ‘${datum}’`);
+//
+//const point = super.parse(...args);
+//
+//point._datum = datum;
+//
+//return point;
+//}
 
 /**
  * Converts ‘this’ lat/lon coordinate to new coordinate system.
@@ -215,16 +174,13 @@ return point;
  *   const pWGS84 = new LatLon(51.47788, -0.00147, 0, LatLon.datums.WGS84);
  *   const pOSGB = pWGS84.convertDatum(LatLon.datums.OSGB36); // 51.4773°N, 000.0001°E
  */
-convertDatum(toDatum) {
-if (!toDatum || toDatum.ellipsoid==undefined) throw new TypeError(`unrecognised datum ‘${toDatum}’`);
+func (l LatLonEllipsoidalDatum) ConvertDatum(toDatum Datum) LatLonEllipsoidalDatum {
+	oldCartesian := l.ToCartesian()                    // convert geodetic to cartesian
+	newCartesian := oldCartesian.ConvertDatum(toDatum) // convert datum
+	newLatLon := newCartesian.ToLatLon()               // convert cartesian back to geodetic
 
-const oldCartesian = this.toCartesian(); // convert geodetic to cartesian
-const newCartesian = oldCartesian.convertDatum(toDatum); // convert datum
-const newLatLon = newCartesian.toLatLon(); // convert cartesian back to geodetic
-
-return newLatLon;
+	return newLatLon
 }
-
 
 /**
  * Converts ‘this’ point from (geodetic) latitude/longitude coordinates to (geocentric) cartesian
@@ -236,68 +192,55 @@ return newLatLon;
  * @returns {Cartesian} Cartesian point equivalent to lat/lon point, with x, y, z in metres from
  *   earth centre, augmented with reference frame conversion methods and properties.
  */
-toCartesian() {
-const cartesian = super.toCartesian();
-const cartesianDatum = new Cartesian_Datum(cartesian.x, cartesian.y, cartesian.z, this.datum);
-return cartesianDatum;
-}
+func (l LatLonEllipsoidalDatum) ToCartesian() Cartesian {
+	// x = (ν+h)⋅cosφ⋅cosλ, y = (ν+h)⋅cosφ⋅sinλ, z = (ν⋅(1-e²)+h)⋅sinφ
+	// where ν = a/√(1−e²⋅sinφ⋅sinφ), e² = (a²-b²)/a² or (better conditioned) 2⋅f-f²
+	ellipsoid := l.Datum.Ellipsoid
 
-}
+	φ := l.Lat * toRadians
+	λ := l.Lon * toRadians
+	h := l.Height
+	a, f := ellipsoid.a, ellipsoid.f
 
+	sinφ := math.Sin(φ)
+	cosφ := math.Cos(φ)
+	sinλ := math.Sin(λ)
+	cosλ := math.Cos(λ)
+
+	eSq := 2*f - f*f                    // 1st eccentricity squared ≡ (a²-b²)/a²
+	ν := a / math.Sqrt(1-eSq*sinφ*sinφ) // radius of curvature in prime vertical
+
+	x := (ν + h) * cosφ * cosλ
+	y := (ν + h) * cosφ * sinλ
+	z := (ν*(1-eSq) + h) * sinφ
+
+	return Cartesian{
+		X:     x,
+		Y:     y,
+		Z:     z,
+		Datum: l.Datum,
+	}
+}
 
 /* Cartesian  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
-
-/**
- * Augments Cartesian with datum the cooordinate is based on, and methods to convert between datums
- * (using Helmert 7-parameter transforms) and to convert cartesian to geodetic latitude/longitude
- * point.
- *
- * @extends Cartesian
- */
-class Cartesian_Datum extends Cartesian {
 
 /**
  * Creates cartesian coordinate representing ECEF (earth-centric earth-fixed) point, on a given
  * datum. The datum will identify the primary meridian (for the x-coordinate), and is also
  * useful in transforming to/from geodetic (lat/lon) coordinates.
  *
- * @param  {number} x - X coordinate in metres (=> 0°N,0°E).
- * @param  {number} y - Y coordinate in metres (=> 0°N,90°E).
- * @param  {number} z - Z coordinate in metres (=> 90°N).
- * @param  {LatLon.datums} [datum] - Datum this coordinate is defined within.
- * @throws {TypeError} Unrecognised datum.
- *
- * @example
- *   import { Cartesian } from '/js/geodesy/latlon-ellipsoidal-datum.js';
- *   const coord = new Cartesian(3980581.210, -111.159, 4966824.522);
  */
-constructor(x, y, z, datum =undefined) {
-if (datum && datum.ellipsoid==undefined) throw new TypeError(`unrecognised datum ‘${datum}’`);
-
-super(x, y, z);
-
-if (datum) this._datum = datum;
+type Cartesian struct {
+	X, Y, Z float64
+	Datum   Datum
 }
-
-
-/**
- * Datum this point is defined within.
- */
-get datum() {
-return this._datum;
-}
-set datum(datum) {
-if (!datum || datum.ellipsoid==undefined) throw new TypeError(`unrecognised datum ‘${datum}’`);
-this._datum = datum;
-}
-
 
 /**
  * Converts ‘this’ (geocentric) cartesian (x/y/z) coordinate to (geodetic) latitude/longitude
  * point (based on the same datum, or WGS84 if unset).
  *
- * Shadow of Cartesian.toLatLon(), returning LatLon augmented with LatLonEllipsoidal_Datum
- * methods convertDatum, toCartesian, etc.
+ * Uses Bowring’s (1985) formulation for μm precision in concise form; ‘The accuracy of geodetic
+ * latitude and height equations’, B R Bowring, Survey Review vol 28, 218, Oct 1985.
  *
  * @returns {LatLon} Latitude/longitude point defined by cartesian coordinates.
  * @throws  {TypeError} Unrecognised datum
@@ -306,19 +249,42 @@ this._datum = datum;
  *   const c = new Cartesian(4027893.924, 307041.993, 4919474.294);
  *   const p = c.toLatLon(); // 50.7978°N, 004.3592°E
  */
-toLatLon(deprecatedDatum = undefined) {
-if (deprecatedDatum) {
-console.info('datum parameter to Cartesian_Datum.toLatLon is deprecated: set datum before calling toLatLon()');
-this.datum = deprecatedDatum;
-}
-const datum = this.datum || datums.WGS84;
-if (!datum || datum.ellipsoid==undefined) throw new TypeError(`unrecognised datum ‘${datum}’`);
+func (c Cartesian) ToLatLon() LatLonEllipsoidalDatum {
+	x, y, z := c.X, c.Y, c.Z
+	a, b, f := c.Datum.Ellipsoid.a, c.Datum.Ellipsoid.b, c.Datum.Ellipsoid.f
 
-const latLon = super.toLatLon(datum.ellipsoid); // TODO: what if datum is not geocentric?
-const point = new LatLonEllipsoidal_Datum(latLon.lat, latLon.lon, latLon.height, this.datum);
-return point;
-}
+	e2 := 2*f - f*f           // 1st eccentricity squared ≡ (a²−b²)/a²
+	ε2 := e2 / (1 - e2)       // 2nd eccentricity squared ≡ (a²−b²)/b²
+	p := math.Sqrt(x*x + y*y) // distance from minor axis
+	R := math.Sqrt(p*p + z*z) // polar radius
 
+	// parametric latitude (Bowring eqn.17, replacing tanβ = z·a / p·b)
+	tanβ := (b * z) / (a * p) * (1 + ε2*b/R)
+	sinβ := tanβ / math.Sqrt(1+tanβ*tanβ)
+	cosβ := sinβ / tanβ
+
+	// geodetic latitude (Bowring eqn.18: tanφ = z+ε²⋅b⋅sin³β / p−e²⋅cos³β)
+	φ := 0.0
+	if !math.IsNaN(cosβ) {
+		φ = math.Atan2(z+ε2*b*sinβ*sinβ*sinβ, p-e2*a*cosβ*cosβ*cosβ)
+	}
+
+	// longitude
+	λ := math.Atan2(y, x)
+
+	// height above ellipsoid (Bowring eqn.7)
+	sinφ := math.Sin(φ)
+	cosφ := math.Cos(φ)
+	ν := a / math.Sqrt(1-e2*sinφ*sinφ) // length of the normal terminated by the minor axis
+	h := p*cosφ + z*sinφ - (a * a / ν)
+
+	return LatLonEllipsoidalDatum{
+		Lat:    φ * toDegrees,
+		Lon:    λ * toDegrees,
+		Height: h,
+		Datum:  c.Datum,
+	}
+}
 
 /**
  * Converts ‘this’ cartesian coordinate to new datum using Helmert 7-parameter transformation.
@@ -331,36 +297,39 @@ return point;
  *   const c = new Cartesian(3980574.247, -102.127, 4966830.065, LatLon.datums.OSGB36);
  *   c.convertDatum(LatLon.datums.Irl1975); // [??,??,??]
  */
-convertDatum(toDatum) {
-// TODO: what if datum is not geocentric?
-if (!toDatum || toDatum.ellipsoid == undefined) throw new TypeError(`unrecognised datum ‘${toDatum}’`);
-if (!this.datum) throw new TypeError('cartesian coordinate has no datum');
+func (c Cartesian) ConvertDatum(toDatum Datum) Cartesian {
+	if c.Datum.Name == toDatum.Name {
+		return c
+	}
 
-let oldCartesian = null;
-let transform = null;
+	// TODO: what if datum is not geocentric?
 
-if (this.datum == undefined || this.datum == datums.WGS84) {
-// converting from WGS 84
-oldCartesian = this;
-transform = toDatum.transform;
+	var (
+		oldCartesian Cartesian
+		transform    [7]float64
+	)
+
+	if c.Datum.Name == "WGS84" {
+		// converting from WGS 84
+		oldCartesian = c
+		transform = toDatum.Transform
+	} else if toDatum.Name == "WGS84" {
+		// converting to WGS 84; use inverse transform
+		oldCartesian = c
+		for i := range c.Datum.Transform {
+			transform[i] = -c.Datum.Transform[i]
+		}
+	} else {
+		// neither this.datum nor toDatum are WGS84: convert this to WGS84 first
+		oldCartesian = c.ConvertDatum(WGS84)
+		transform = toDatum.Transform
+	}
+
+	newCartesian := oldCartesian.applyTransform(transform)
+	newCartesian.Datum = toDatum
+
+	return newCartesian
 }
-if (toDatum == datums.WGS84) {
-// converting to WGS 84; use inverse transform
-oldCartesian = this;
-transform = this.datum.transform.map(p = > -p);
-}
-if (transform == null) {
-// neither this.datum nor toDatum are WGS84: convert this to WGS84 first
-oldCartesian = this.convertDatum(datums.WGS84);
-transform = toDatum.transform;
-}
-
-const newCartesian = oldCartesian.applyTransform(transform);
-newCartesian.datum = toDatum;
-
-return newCartesian;
-}
-
 
 /**
  * Applies Helmert 7-parameter transformation to ‘this’ coordinate using transform parameters t.
@@ -371,24 +340,27 @@ return newCartesian;
  * @param   {number[]} t - Transformation to apply to this coordinate.
  * @returns {Cartesian} Transformed point.
  */
-applyTransform(t)   {
-// this point
-const { x: x1, y: y1, z: z1 } = this;
+func (c Cartesian) applyTransform(t [7]float64) Cartesian {
+	// this point
+	x1, y1, z1 := c.X, c.Y, c.Z
 
-// transform parameters
-const tx = t[0]; // x-shift in metres
-const ty = t[1]; // y-shift in metres
-const tz = t[2]; // z-shift in metres
-const s = t[3]/1e6 + 1; // scale: normalise parts-per-million to (s+1)
-const rx = (t[4]/3600).toRadians(); // x-rotation: normalise arcseconds to radians
-const ry = (t[5]/3600).toRadians(); // y-rotation: normalise arcseconds to radians
-const rz = (t[6]/3600).toRadians(); // z-rotation: normalise arcseconds to radians
+	// transform parameters
+	tx := t[0]                      // x-shift in metres
+	ty := t[1]                      // y-shift in metres
+	tz := t[2]                      // z-shift in metres
+	s := t[3]/1e6 + 1               // scale: normalise parts-per-million to (s+1)
+	rx := (t[4] / 3600) * toRadians // x-rotation: normalise arcseconds to radians
+	ry := (t[5] / 3600) * toRadians // y-rotation: normalise arcseconds to radians
+	rz := (t[6] / 3600) * toRadians // z-rotation: normalise arcseconds to radians
 
-// apply transform
-const x2 = tx + x1*s  - y1*rz + z1*ry;
-const y2 = ty + x1*rz + y1*s  - z1*rx;
-const z2 = tz - x1*ry + y1*rx + z1*s;
+	// apply transform
+	x2 := tx + x1*s - y1*rz + z1*ry
+	y2 := ty + x1*rz + y1*s - z1*rx
+	z2 := tz - x1*ry + y1*rx + z1*s
 
-return new Cartesian_Datum(x2, y2, z2);
-}
+	return Cartesian{
+		X: x2,
+		Y: y2,
+		Z: z2,
+	}
 }
