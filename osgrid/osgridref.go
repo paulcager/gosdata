@@ -143,16 +143,16 @@ func ParseOsGridRef(s string) (OsGridRef, error) {
 	return OsGridRef{Easting: e100km*100000 + int(easting), Northing: n100km*100000 + int(northing)}, nil
 }
 
-func (o OsGridRef) valid() bool {
+func (o OsGridRef) Valid() bool {
 	return o.Easting >= 0 && o.Easting <= 700e3 && o.Northing >= 0 && o.Northing <= 1300e3
 }
 func (o OsGridRef) assertValid() {
-	if !o.valid() {
+	if !o.Valid() {
 		panic(fmt.Sprintf("Invalid OS grid ref: %+v", o))
 	}
 }
 
-func (o OsGridRef) toLatLon() (float64, float64) {
+func (o OsGridRef) ToLatLon() (float64, float64) {
 	E := float64(o.Easting)
 	N := float64(o.Northing)
 

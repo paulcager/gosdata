@@ -65,7 +65,7 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 			}
 			o, err := ParseOsGridRef(gridRef)
 			assert.NoError(t, err)
-			lat, lon := o.toLatLon()
+			lat, lon := o.ToLatLon()
 			lat1, lon1, err := OttoGridToLatLon(gridRef)
 			assert.NoError(t, err)
 			fmt.Printf("%s: expected %f,%f got %f,%f (JS: %f,%f)\n", tt.name, tt.expectedLat, tt.expectedLon, lat, lon, lat1, lon1)

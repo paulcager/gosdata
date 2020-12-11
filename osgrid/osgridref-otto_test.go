@@ -63,7 +63,7 @@ func BenchmarkGoImpl(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		o, err := ParseOsGridRef("TL 44982 57869")
 		assert.NoError(b, err)
-		_, _ = o.toLatLon()
+		_, _ = o.ToLatLon()
 	}
 }
 
