@@ -15,14 +15,12 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 	}
 	tests := []struct {
 		name        string
-		easting     int
-		northing    int
+		gridRef     string
 		expectedLat float64
 		expectedLon float64
 	}{
 		{
-			name:    "SJ 92395 52997",
-			easting: 392395, northing: 352997,
+			name: "SJ 92395 52997",
 			// From  http://www.movable-type.co.uk/scripts/latlong-os-gridref.html:
 			// 	For OSGB36, expect 53.073851°N, 002.113526°W
 			//	For WGS84,  expect 53.074149°N, 002.114964°W
@@ -30,30 +28,49 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 			expectedLon: -2.114964,
 		},
 		{
-			name:    "TG 51409 13177",
-			easting: 651409, northing: 313177,
+			name:        "TG 51409 13177",
 			expectedLat: +52.657977,
 			expectedLon: 1.716020,
 		},
 		{
-			name:    "Movable Type Example (TL4498257869)",
-			easting: 544982, northing: 257869,
+			name:        "Movable Type Example (TL4498257869)",
+			gridRef:     "TL4498257869",
 			expectedLat: 52.199992,
 			expectedLon: 0.119989,
+		},
+		{
+			name:        "Cardiff (ST1784076329)",
+			gridRef:     "ST1784076329",
+			expectedLat: 51.479928,
+			expectedLon: -3.184500,
+		},
+		{
+			name:        "Aberdeen (NJ9439206608)",
+			gridRef:     "NJ9439206608",
+			expectedLat: 57.150318,
+			expectedLon: -2.094323,
+		},
+		{
+			name:        "Newlyn (SW4676028548)",
+			gridRef:     "SW4676028548",
+			expectedLat: 50.102910,
+			expectedLon: -5.542751,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o := OsGridRef{
-				Easting:  tt.easting,
-				Northing: tt.northing,
+			gridRef := tt.gridRef
+			if gridRef == "" {
+				gridRef = tt.name
 			}
+			o, err := ParseOsGridRef(gridRef)
+			assert.NoError(t, err)
 			lat, lon := o.toLatLon()
-			lat1, lon1, err := OSGridToLatLon(fmt.Sprintf("%d,%d", tt.easting, tt.northing))
+			lat1, lon1, err := OttoGridToLatLon(gridRef)
 			assert.NoError(t, err)
 			fmt.Printf("%s: expected %f,%f got %f,%f (JS: %f,%f)\n", tt.name, tt.expectedLat, tt.expectedLon, lat, lon, lat1, lon1)
-			assert.InEpsilon(t, tt.expectedLat, lat, 0.00005)
-			assert.InEpsilon(t, tt.expectedLon, lon, 0.00005)
+			assert.InDelta(t, tt.expectedLat, lat, 0.00005)
+			assert.InDelta(t, tt.expectedLon, lon, 0.00005)
 		})
 	}
 }

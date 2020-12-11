@@ -196,7 +196,7 @@ func (o OsGridRef) toLatLon() (float64, float64) {
 	XII := secφ / (120 * ν5) * (5 + 28*tan2φ + 24*tan4φ)
 	XIIA := secφ / (5040 * ν7) * (61 + 662*tan2φ + 1320*tan4φ + 720*tan6φ)
 
-	dE := (E - E0)
+	dE := E - E0
 	dE2 := dE * dE
 	dE3 := dE2 * dE
 	dE4 := dE2 * dE2

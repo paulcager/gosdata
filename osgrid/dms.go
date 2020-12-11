@@ -94,5 +94,5 @@ func Wrap360(degrees float64) float64 {
 		a = 180.0
 		p = 360.0
 	)
-	return math.Mod((math.Mod(2 * a * x / p, p)) + p, p)
+	return math.Mod((math.Mod(2*a*x/p, p))+p, p)
 }

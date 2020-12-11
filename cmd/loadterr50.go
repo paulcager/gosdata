@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"flag"
 	"fmt"
-	"github.com/paulcager/gosdata/osgrid"
 	"io"
 	_ "io/ioutil"
 	"os"
@@ -22,7 +21,6 @@ const (
 var versionFlag *bool = flag.Bool("v", false, "Print the version number.")
 
 func main() {
-	osgrid.X()
 	flag.Parse()
 
 	if *versionFlag {
