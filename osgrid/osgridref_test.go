@@ -71,6 +71,16 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 			fmt.Printf("%s: expected %f,%f got %f,%f (JS: %f,%f)\n", tt.name, tt.expectedLat, tt.expectedLon, lat, lon, lat1, lon1)
 			assert.InDelta(t, tt.expectedLat, lat, 0.00005)
 			assert.InDelta(t, tt.expectedLon, lon, 0.00005)
+
+			ll := LatLonEllipsoidalDatum{
+				Lat:    lat,
+				Lon:    lon,
+				Datum:  WGS84,
+			}
+
+			gridRef2 := ll.ToOsGridRef()
+			assert.Equal(t, o.Easting, gridRef2.Easting)
+			assert.Equal(t, o.Northing, gridRef2.Northing)
 		})
 	}
 }

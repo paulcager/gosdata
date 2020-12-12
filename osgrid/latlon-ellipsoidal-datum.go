@@ -1,6 +1,10 @@
 package osgrid
 
-import "math"
+import (
+	"fmt"
+	"math"
+	"strings"
+)
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 /* Geodesy tools for conversions between (historical) datums          (c) Chris Veness 2005-2019  */
@@ -125,43 +129,59 @@ type LatLonEllipsoidalDatum struct {
 	Datum            Datum
 }
 
-///**
-// * Parses a latitude/longitude point from a variety of formats.
-// *
-// * Latitude & longitude (in degrees) can be supplied as two separate parameters, as a single
-// * comma-separated lat/lon string, or as a single object with { lat, lon } or GeoJSON properties.
-// *
-// * The latitude/longitude values may be numeric or strings; they may be signed decimal or
-// * deg-min-sec (hexagesimal) suffixed by compass direction (NSEW); a variety of separators are
-// * accepted. Examples -3.62, '3 37 12W', '3°37′12″W'.
-// *
-// * Thousands/decimal separators must be comma/dot; use Dms.fromLocale to convert locale-specific
-// * thousands/decimal separators.
-// *
-// * @param   {number|string|Object} lat|latlon - Geodetic Latitude (in degrees) or comma-separated lat/lon or lat/lon object.
-// * @param   {number}               [lon] - Longitude in degrees.
-// * @param   {number}               [height=0] - Height above ellipsoid in metres.
-// * @param   {LatLon.datums}        [datum=WGS84] - Datum this point is defined within.
-// * @returns {LatLon} Latitude/longitude point on ellipsoidal model earth using given datum.
-// * @throws  {TypeError} Unrecognised datum.
-// *
-// * @example
-// *   const p = LatLon.parse('51.47736, 0.0000', 0, LatLon.datums.OSGB36);
-// */
-//static parse(...args) {
-//let datum = datums.WGS84;
-//
-//// if the last argument is a datum, use that, otherwise use default WGS-84
-//if (args.length==4 || (args.length==3 && typeof args[2] == 'object')) datum = args.pop();
-//
-//if (!datum || datum.ellipsoid==undefined) throw new TypeError(`unrecognised datum ‘${datum}’`);
-//
-//const point = super.parse(...args);
-//
-//point._datum = datum;
-//
-//return point;
-//}
+/**
+* Parses a latitude/longitude point from a variety of formats.
+*
+* Latitude & longitude (in degrees) can be supplied as two separate parameters, as a single
+* comma-separated lat/lon string, or as a single object with { lat, lon } or GeoJSON properties.
+*
+* The latitude/longitude values may be numeric or strings; they may be signed decimal or
+* deg-min-sec (hexagesimal) suffixed by compass direction (NSEW); a variety of separators are
+* accepted. Examples -3.62, '3 37 12W', '3°37′12″W'.
+*
+* Thousands/decimal separators must be comma/dot; use Dms.fromLocale to convert locale-specific
+* thousands/decimal separators.
+*
+* @param   {number|string|Object} lat|latlon - Geodetic Latitude (in degrees) or comma-separated lat/lon or lat/lon object.
+* @param   {number}               [lon] - Longitude in degrees.
+* @param   {number}               [height=0] - Height above ellipsoid in metres.
+* @param   {LatLon.datums}        [datum=WGS84] - Datum this point is defined within.
+* @returns {LatLon} Latitude/longitude point on ellipsoidal model earth using given datum.
+* @throws  {TypeError} Unrecognised datum.
+*
+* @example
+*   const p1 = LatLon.parse('51.47736, 0.0000', 0, LatLon.datums.OSGB36);
+*   const p2 = LatLon.parse('51°28′40″N, 000°00′05″W', 17);
+ */
+func ParseLatLon(latLon string, height float64, datum Datum) (LatLonEllipsoidalDatum, error) {
+	errMessage := fmt.Errorf("invalid LatLon: '%s'", latLon)
+
+	if datum.Name == "" {
+		datum = WGS84
+	}
+
+	// single comma-separated lat/lon
+	parts := strings.Split(latLon, ",")
+	if len(parts) != 2 {
+		return LatLonEllipsoidalDatum{}, errMessage
+	}
+
+	lat, err1 := ParseDegrees(parts[0])
+	lat = Wrap90(lat)
+	lon, err2 := ParseDegrees(parts[1])
+	lon = Wrap180(lon)
+
+	if err1 != nil || err2 != nil {
+		return LatLonEllipsoidalDatum{}, errMessage
+	}
+
+	return LatLonEllipsoidalDatum{
+		Lat:    lat,
+		Lon:    lon,
+		Height: height,
+		Datum:  datum,
+	}, nil
+}
 
 /**
  * Converts ‘this’ lat/lon coordinate to new coordinate system.
@@ -219,6 +239,57 @@ func (l LatLonEllipsoidalDatum) ToCartesian() Cartesian {
 		Y:     y,
 		Z:     z,
 		Datum: l.Datum,
+	}
+}
+
+func (l LatLonEllipsoidalDatum) ToOsGridRef() OsGridRef {
+	// if necessary convert to OSGB36 first
+	point := l
+	if point.Datum.Name != OSGB36.Name {
+		point = point.ConvertDatum(OSGB36)
+	}
+
+	φ := point.Lat * toRadians
+	λ := point.Lon * toRadians
+
+	cosφ := math.Cos(φ)
+	sinφ := math.Sin(φ)
+	ν := a * F0 / math.Sqrt(1-e2*sinφ*sinφ)                // nu = transverse radius of curvature
+	ρ := a * F0 * (1 - e2) / math.Pow(1-e2*sinφ*sinφ, 1.5) // rho = meridional radius of curvature
+	η2 := ν/ρ - 1                                          // eta = ?
+
+	Ma := (1 + n + (5/4)*n2 + (5/4)*n3) * (φ - φ0)
+	Mb := (3*n + 3*n*n + (21/8)*n3) * math.Sin(φ-φ0) * math.Cos(φ+φ0)
+	Mc := ((15/8)*n2 + (15/8)*n3) * math.Sin(2*(φ-φ0)) * math.Cos(2*(φ+φ0))
+	Md := (35 / 24) * n3 * math.Sin(3*(φ-φ0)) * math.Cos(3*(φ+φ0))
+	M := b * F0 * (Ma - Mb + Mc - Md) // meridional arc
+
+	cos3φ := cosφ * cosφ * cosφ
+	cos5φ := cos3φ * cosφ * cosφ
+	tan2φ := math.Tan(φ) * math.Tan(φ)
+	tan4φ := tan2φ * tan2φ
+
+	I := M + N0
+	II := (ν / 2) * sinφ * cosφ
+	III := (ν / 24) * sinφ * cos3φ * (5 - tan2φ + 9*η2)
+	IIIA := (ν / 720) * sinφ * cos5φ * (61 - 58*tan2φ + tan4φ)
+	IV := ν * cosφ
+	V := (ν / 6) * cos3φ * (ν/ρ - tan2φ)
+	VI := (ν / 120) * cos5φ * (5 - 18*tan2φ + tan4φ + 14*η2 - 58*tan2φ*η2)
+
+	Δλ := λ - λ0
+	Δλ2 := Δλ * Δλ
+	Δλ3 := Δλ2 * Δλ
+	Δλ4 := Δλ3 * Δλ
+	Δλ5 := Δλ4 * Δλ
+	Δλ6 := Δλ5 * Δλ
+
+	N := I + II*Δλ2 + III*Δλ4 + IIIA*Δλ6
+	E := E0 + IV*Δλ + V*Δλ3 + VI*Δλ5
+
+	return OsGridRef{
+		Easting:  int(math.Round(E)),
+		Northing: int(math.Round(N)),
 	}
 }
 

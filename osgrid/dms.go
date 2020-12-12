@@ -1,6 +1,12 @@
 package osgrid
 
-import "math"
+import (
+	"fmt"
+	"math"
+	"regexp"
+	"strconv"
+	"strings"
+)
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -  */
 /* Geodesy representation conversion functions                        (c) Chris Veness 2002-2020  */
@@ -16,6 +22,11 @@ import "math"
  *
  * @module dms
  */
+
+var (
+	// /[^0-9., ]+/
+	separatorChars = regexp.MustCompile(`[^0-9.]+`)
+)
 
 /**
  * Constrain degrees to range -90..+90 (for latitude); e.g. -91 => -89, 91 => 89.
@@ -95,4 +106,82 @@ func Wrap360(degrees float64) float64 {
 		p = 360.0
 	)
 	return math.Mod((math.Mod(2*a*x/p, p))+p, p)
+}
+
+func invalid(s string) error {
+	return fmt.Errorf("invalid degree: '%s'", s)
+}
+
+/**
+ * Parses string representing degrees/minutes/seconds into numeric degrees.
+ *
+ * This is very flexible on formats, allowing signed decimal degrees, or deg-min-sec optionally
+ * suffixed by compass direction (NSEW); a variety of separators are accepted. Examples -3.62,
+ * '3 37 12W', '3°37′12″W'.
+ *
+ * Thousands/decimal separators must be comma/dot; use Dms.fromLocale to convert locale-specific
+ * thousands/decimal separators.
+ *
+ * @param   {string|number} dms - Degrees or deg/min/sec in variety of formats.
+ * @returns {number}        Degrees as decimal number.
+ *
+ * @example
+ *   const lat = Dms.parse('51° 28′ 40.37″ N');
+ *   const lon = Dms.parse('000° 00′ 05.29″ W');
+ *   const p1 = new LatLon(lat, lon); // 51.4779°N, 000.0015°W
+ */
+func ParseDegrees(s string) (float64, error) {
+	orig := s
+	s = strings.TrimSpace(s)
+	// check for signed decimal degrees without NSEW, if so return it directly
+	f, err := strconv.ParseFloat(s, 64)
+	if err == nil {
+		return f, nil
+	}
+
+	if len(s) == 0 {
+		return 0, invalid(orig)
+	}
+	// strip off any sign or compass dir'n & split out separate d/m/s
+	negative := s[0] == '-'
+	if s[0] == '-' || s[0] == '+' {
+		s = s[1:]
+	}
+	s = strings.TrimSpace(s)
+
+	if len(s) == 0 {
+		return 0, invalid(orig)
+	}
+
+	switch s[len(s)-1] {
+	case 'S', 'W':
+		negative = true
+		s = s[:len(s)-1]
+	case 'N', 'E':
+		s = s[:len(s)-1]
+	}
+	s = strings.TrimSpace(s)
+
+	dmsParts := separatorChars.Split(s, -1)
+	if dmsParts[0] == "" {
+		return 0, invalid(orig)
+	}
+	if dmsParts[len(dmsParts)-1] == "" {
+		dmsParts=dmsParts[:len(dmsParts)-1]
+	}
+	multiplier := 1.0
+	sum := 0.0
+	for i := range dmsParts {
+		f, err := strconv.ParseFloat(dmsParts[i], 64)
+		if err != nil {
+			return 0, invalid(orig)
+		}
+		sum += f *multiplier
+		multiplier /= 60.0
+	}
+
+	if negative {
+		sum = -sum
+	}
+	return sum, nil
 }
