@@ -3,16 +3,13 @@ package osgrid
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestOsGridRef_toLatLon(t *testing.T) {
-	type fields struct {
-		Easting  int
-		Northing int
-	}
 	tests := []struct {
 		name        string
 		gridRef     string
@@ -45,6 +42,12 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 			expectedLon: -3.184500,
 		},
 		{
+			name:        "Cardiff_Low_Res (ST 17 76)",
+			gridRef:     "ST 17 76",
+			expectedLat: 51.4768378,
+			expectedLon: -3.1965158,
+		},
+		{
 			name:        "Aberdeen (NJ9439206608)",
 			gridRef:     "NJ9439206608",
 			expectedLat: 57.150318,
@@ -73,14 +76,18 @@ func TestOsGridRef_toLatLon(t *testing.T) {
 			assert.InDelta(t, tt.expectedLon, lon, 0.00005)
 
 			ll := LatLonEllipsoidalDatum{
-				Lat:    lat,
-				Lon:    lon,
-				Datum:  WGS84,
+				Lat:   lat,
+				Lon:   lon,
+				Datum: WGS84,
 			}
 
 			gridRef2 := ll.ToOsGridRef()
 			assert.Equal(t, o.Easting, gridRef2.Easting)
 			assert.Equal(t, o.Northing, gridRef2.Northing)
+
+			orig := strings.ReplaceAll(gridRef, " ", "")
+			str := strings.ReplaceAll(o.StringN(len(orig)-2), " ", "")
+			assert.Equal(t, orig, str)
 		})
 	}
 }
@@ -149,4 +156,36 @@ func TestParseOsGridRef(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Example() {
+	// 			name:        "Newlyn (SW4676028548)",
+	//			gridRef:     "SW4676028548",
+	//			expectedLat: 50.102910,
+	//			expectedLon: -5.542751, //
+
+	// Parse the OS Grid Reference for Newlyn
+	gridRef, err := ParseOsGridRef("SW 46760 28548")
+	if err != nil {
+		panic(err)
+	}
+
+	// Print it as an 8-digit reference:
+	fmt.Println(gridRef.StringN(8))
+
+	// Or without spaces:
+	fmt.Println(gridRef.StringNCompact(8))
+
+	// Or as an Eastings / Northings pair:
+	fmt.Println(gridRef.NumericString())
+
+	// Now convert to Lat / Lon (using the "standard" mapping, WGS84)
+	lat, lon := gridRef.ToLatLon()
+	fmt.Printf("%.4f,%.4f\n", lat, lon)
+
+	// Output:
+	// SW 4676 2854
+	// SW46762854
+	// 146760,28548
+	// 50.1029,-5.5428
 }

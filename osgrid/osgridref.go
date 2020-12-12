@@ -212,6 +212,60 @@ func (o OsGridRef) ToLatLon() (float64, float64) {
 	return φ, λ
 }
 
+func (o OsGridRef) String() string {
+	return o.StringN(8)
+}
+
+func (o OsGridRef) StringNCompact(digits int) string {
+	return o.stringN(digits, false)
+}
+
+func (o OsGridRef) StringN(digits int) string {
+	return o.stringN(digits, true)
+}
+
+func (o OsGridRef) stringN(digits int, spaces bool) string {
+	e, n := o.Easting, o.Northing
+	// get the 100km-grid indices
+	e100km := e / 100_000
+	n100km := n / 100_000
+
+	// translate those into numeric equivalents of the grid letters
+	l1 := (19 - n100km) - (19-n100km)%5 + (e100km+10)/5
+	l2 := (19-n100km)*5%25 + e100km%5
+
+	// compensate for skipped 'I' and build grid letter-pairs
+	if l1 > 7 {
+		l1++
+	}
+	if l2 > 7 {
+		l2++
+	}
+	letterPair := string([]byte{byte(l1 + 'A'), byte(l2 + 'A')})
+
+	pow := func(n int) int {
+		ret := 1
+		for i := 0; i < n; i++ {
+			ret *= 10
+		}
+		return ret
+	}
+
+	// strip 100km-grid indices from easting & northing, and reduce precision
+	e = (e % 100000) / pow(5-digits/2)
+	n = (n % 100000) / pow(5-digits/2)
+
+	// pad eastings & northings with leading zeros
+	if spaces {
+		return fmt.Sprintf("%s %0*d %0*d", letterPair, digits/2, e, digits/2, n)
+	}
+	return fmt.Sprintf("%s%0*d%0*d", letterPair, digits/2, e, digits/2, n)
+}
+
+func (o OsGridRef) NumericString() string {
+	return fmt.Sprintf("%d,%d", o.Easting, o.Northing)
+}
+
 func osgb36ToWGS84(lat, lon float64) (float64, float64) {
 	latLon := LatLonEllipsoidalDatum{
 		Lat:    lat,
