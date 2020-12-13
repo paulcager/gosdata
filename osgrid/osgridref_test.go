@@ -159,12 +159,8 @@ func TestParseOsGridRef(t *testing.T) {
 }
 
 func Example() {
-	// 			name:        "Newlyn (SW4676028548)",
-	//			gridRef:     "SW4676028548",
-	//			expectedLat: 50.102910,
-	//			expectedLon: -5.542751, //
 
-	// Parse the OS Grid Reference for Newlyn
+	// Parse the OS Grid Reference for Newlyn Harbour
 	gridRef, err := ParseOsGridRef("SW 46760 28548")
 	if err != nil {
 		panic(err)
@@ -182,6 +178,9 @@ func Example() {
 	// Now convert to Lat / Lon (using the "standard" mapping, WGS84)
 	lat, lon := gridRef.ToLatLon()
 	fmt.Printf("%.4f,%.4f\n", lat, lon)
+
+	// The returned lat/lon could now be pasted into, for example, Google maps:
+	//		https://www.google.com/maps/@50.1026075,-5.5457719,17z
 
 	// Output:
 	// SW 4676 2854
