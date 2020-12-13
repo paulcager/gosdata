@@ -45,7 +45,7 @@ as when providing a Google Maps link.
 It's difficult. Very, very difficult. Pages of this sort of stuff:
 
 ![img.png](images/scary-maths.png)
-> (an excerpt from the Ordnance Surveys
+> (an excerpt from the Ordnance Survey's
 [reference guide](https://www.ordnancesurvey.co.uk/documents/resources/guide-coordinate-systems-great-britain.pdf))
 
 Fortunately Chris Veness has already done the hard work of implementing this in his
