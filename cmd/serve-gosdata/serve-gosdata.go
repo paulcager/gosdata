@@ -3,14 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/paulcager/gosdata"
-	"github.com/paulcager/osgridref"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/paulcager/go-http-middleware"
+	"github.com/paulcager/gosdata"
+	"github.com/paulcager/osgridref"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	flag "github.com/spf13/pflag"
 )
 
@@ -19,9 +20,9 @@ const (
 )
 
 var (
-	port string
-	dataDir string
-	tileServer  *gosdata.TileServer
+	port       string
+	dataDir    string
+	tileServer *gosdata.TileServer
 )
 
 func main() {
@@ -40,9 +41,16 @@ func main() {
 }
 
 func makeHTTPServer(listenPort string) *http.Server {
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/"+apiVersion+"/height/", handle)
+	http.Handle(
+		"/metrics",
+		promhttp.Handler())
+
+	http.Handle(
+		"/"+apiVersion+"/height/",
+		middleware.MakeLoggingHandler(http.HandlerFunc(handle)))
+
 	log.Println("Starting HTTP server on " + listenPort)
+
 	s := &http.Server{
 		ReadHeaderTimeout: 20 * time.Second,
 		WriteTimeout:      2 * time.Minute,
@@ -89,7 +97,11 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleError(w http.ResponseWriter, _ *http.Request, str string, _ error) {
+func handleError(w http.ResponseWriter, _ *http.Request, str string, err error) {
 	w.WriteHeader(http.StatusBadRequest)
-	fmt.Fprintf(w, "Invalid request: %q\n", str)
+	if err != nil {
+		fmt.Fprintf(w, "Invalid request: %q (%s)\n", str, err)
+	} else {
+		fmt.Fprintf(w, "Invalid request: %q\n", str)
+	}
 }
