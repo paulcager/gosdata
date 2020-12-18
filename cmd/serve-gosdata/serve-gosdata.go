@@ -11,7 +11,6 @@ import (
 	"github.com/paulcager/go-http-middleware"
 	"github.com/paulcager/gosdata"
 	"github.com/paulcager/osgridref"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	flag "github.com/spf13/pflag"
 )
 
@@ -41,9 +40,7 @@ func main() {
 }
 
 func makeHTTPServer(listenPort string) *http.Server {
-	http.Handle(
-		"/metrics",
-		promhttp.Handler())
+	middleware.EnablePrometheus()
 
 	http.Handle(
 		"/"+apiVersion+"/height/",
