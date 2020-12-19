@@ -8,7 +8,7 @@ RUN cd /go/src/github.com/paulcager/gosdata && go test ./... && go install ./...
 
 
 FROM debian:stable-slim
-RUN apt-get update && apt-get -y upgrade
+RUN apt-get update && apt-get -y upgrade && apt-get install -y ca-certificates
 WORKDIR /app
 COPY --from=build /go/bin/* .
 RUN ./load-gosdata -o . && rm terrain-50.zip
